@@ -5,19 +5,25 @@ on:
     types: [created]
 
 jobs:
+  deploy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: acknowledge deployment request to commenter
+        id: check
+        uses: khan/pull-request-comment-trigger@master
+        with:
+          trigger: "/deploy"
+          reaction: rocket
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+    outputs:
+      triggered: ${{ steps.check.outputs.triggered }}
 
   deploy-web:
     runs-on: ubuntu-latest
+    needs: deploy-check
+    if: needs.deploy-check.outputs.triggered == 'true'
     steps:
-
-      - uses: khan/pull-request-comment-trigger@master
-        id: check
-        with:
-          trigger: '/deploy'
-          reaction: rocket
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          
       - name: get pull request ref
         id: get_pull_request_ref
         uses: octokit/request-action@v2.x
@@ -27,27 +33,180 @@ jobs:
           issue_id: ${{ github.event.issue.number }}
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: create web deployment
+        id: create_deployment
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/:repository/deployments
+          repository: ${{ github.repository }}
+          ref: ${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}
+          environment: staging
+          auto_merge: false
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "clone repos"
+      - name: set web deployment status to in progress
+        id: start_deployment
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ fromJson(steps.create_deployment.outputs.data).id }}
+          environment: staging
+          environment_url: https://dataconsolidator.staging.daliaresearch.com/login
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          state: in_progress
+          mediaType: '{"previews": ["flash", "ant-man"]}'
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "Checkout pull request by branch"
         uses: 'actions/checkout@v2'
         with:
           ref: ${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}
-        if: steps.check.outputs.triggered == 'true'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           
-      - name: "Checkout to a branch"
-        run: |
-          BRANCH="${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}"
-          echo "Checking out from branch $BRANCH"
-          git branch
-          git log 
-        if: steps.check.outputs.triggered == 'true'
+      # - name: "Prepare Elastic Beanstalk configs"
+      #   run: source ./deploy/prepare_beanstalk.sh staging web dataconsolidator ${{ github.sha }}
+
+      # - name: "Zip the repo"
+      #   run: zip -r deploy-web.zip . -x '*.git*'
+
+      # - name: "Deploy web to EB"
+      #   uses: einaregilsson/beanstalk-deploy@v16
+      #   with:
+      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     application_name: dataconsolidator-staging
+      #     environment_name: dataconsolidator-staging-web
+      #     deployment_package: deploy-web.zip
+      #     use_existing_version_if_available: true
+      #     version_label: web-${{ github.sha }}
+      #     region: eu-west-1
+       - name: "set web deployment status to success"
+        id: successful_deployment
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ fromJson(steps.create_deployment.outputs.data).id }}
+          environment: staging
+          environment_url: https://dataconsolidator.staging.daliaresearch.com/login
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          mediaType: '{"previews": ["ant-man"]}'
+          state: success
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "set web deployment status to failure"
+        id: failed_deployment
+        uses: octokit/request-action@v2.x
+        if: failure()
+        with:
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ fromJson(steps.create_deployment.outputs.data).id }}
+          environment: staging
+          environment_url: https://dataconsolidator.staging.daliaresearch.com/login
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          mediaType: '{"previews": ["ant-man"]}'
+          state: failure
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+  deploy-activejobs:
+    runs-on: ubuntu-latest
+    needs: deploy-check
+    if: needs.deploy-check.outputs.triggered == 'true'
+    steps:
+      - name: get pull request ref
+        id: get_pull_request_ref
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/:repository/pulls/:issue_id
+          repository: ${{ github.repository }}
+          issue_id: ${{ github.event.issue.number }}
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: create activejobs deployment
+        id: create_deployment
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/:repository/deployments
+          repository: ${{ github.repository }}
+          ref: ${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}
+          environment: staging
+          auto_merge: false
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: set activejobs deployment status to in progress
+        id: start_deployment
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ fromJson(steps.create_deployment.outputs.data).id }}
+          environment: staging
+          environment_url: https://dataconsolidator.staging.daliaresearch.com/login
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          state: in_progress
+          mediaType: '{"previews": ["flash", "ant-man"]}'
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "Checkout pull request by branch"
+        uses: 'actions/checkout@v2'
+        with:
+          ref: ${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
-      - name: "Deploy"
-        run: |
-          # deployment logic goes here
-          ls -ah
-          cat index.html
+      # - name: "Prepare Elastic Beanstalk configs"
+      #   run: source ./deploy/prepare_beanstalk.sh staging activejobs dataconsolidator ${{ github.sha }}
+
+      # - name: "Zip the repo"
+      #   run: zip -r deploy-activejobs.zip . -x '*.git*'
+
+      # - name: "Deploy activejobs to EB"
+      #   uses: einaregilsson/beanstalk-deploy@v16
+      #   with:
+      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     application_name: dataconsolidator-staging
+      #     environment_name: dataconsolidator-staging-activejobs
+      #     deployment_package: deploy-activejobs.zip
+      #     use_existing_version_if_available: true
+      #     version_label: activejobs-${{ github.sha }}
+      #     region: eu-west-1
+       - name: "set activejobs deployment status to success"
+        id: successful_deployment
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ fromJson(steps.create_deployment.outputs.data).id }}
+          environment: staging
+          environment_url: https://dataconsolidator.staging.daliaresearch.com/login
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          mediaType: '{"previews": ["ant-man"]}'
+          state: success
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "set activejobs deployment status to failure"
+        id: failed_deployment
+        uses: octokit/request-action@v2.x
+        if: failure()
+        with:
+          route: POST /repos/:repository/deployments/:deployment/statuses
+          repository: ${{ github.repository }}
+          deployment: ${{ fromJson(steps.create_deployment.outputs.data).id }}
+          environment: staging
+          environment_url: https://dataconsolidator.staging.daliaresearch.com/login
+          log_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          mediaType: '{"previews": ["ant-man"]}'
+          state: failure
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
