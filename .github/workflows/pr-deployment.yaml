@@ -30,16 +30,18 @@ jobs:
 
       - name: "clone repos"
         uses: 'actions/checkout@v2'
+        with:
+          ref: ${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}
         if: steps.check.outputs.triggered == 'true'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           
       - name: "Checkout to a branch"
         run: |
-          PR_URL="${{ github.event.pull_request.head.sha }}"
           BRANCH="${{ fromJson(steps.get_pull_request_ref.outputs.data).head.ref }}"
-          echo "Checking out from $PR_URL and branch $BRANCH"
-          git checkout $BRANCH
+          echo "Checking out from branch $BRANCH"
+          git branch
+          git log 
         if: steps.check.outputs.triggered == 'true'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
