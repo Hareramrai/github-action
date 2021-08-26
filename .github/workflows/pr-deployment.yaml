@@ -28,10 +28,8 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "Checkout to the current branch"
+      - name: "clone repos"
         uses: 'actions/checkout@v2'
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
         if: steps.check.outputs.triggered == 'true'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
