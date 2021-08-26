@@ -67,23 +67,6 @@ jobs:
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           
-      # - name: "Prepare Elastic Beanstalk configs"
-      #   run: source ./deploy/prepare_beanstalk.sh staging web dataconsolidator ${{ github.sha }}
-
-      # - name: "Zip the repo"
-      #   run: zip -r deploy-web.zip . -x '*.git*'
-
-      # - name: "Deploy web to EB"
-      #   uses: einaregilsson/beanstalk-deploy@v16
-      #   with:
-      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     application_name: dataconsolidator-staging
-      #     environment_name: dataconsolidator-staging-web
-      #     deployment_package: deploy-web.zip
-      #     use_existing_version_if_available: true
-      #     version_label: web-${{ github.sha }}
-      #     region: eu-west-1
        - name: "set web deployment status to success"
         id: successful_deployment
         uses: octokit/request-action@v2.x
@@ -163,23 +146,6 @@ jobs:
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
-      # - name: "Prepare Elastic Beanstalk configs"
-      #   run: source ./deploy/prepare_beanstalk.sh staging activejobs dataconsolidator ${{ github.sha }}
-
-      # - name: "Zip the repo"
-      #   run: zip -r deploy-activejobs.zip . -x '*.git*'
-
-      # - name: "Deploy activejobs to EB"
-      #   uses: einaregilsson/beanstalk-deploy@v16
-      #   with:
-      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     application_name: dataconsolidator-staging
-      #     environment_name: dataconsolidator-staging-activejobs
-      #     deployment_package: deploy-activejobs.zip
-      #     use_existing_version_if_available: true
-      #     version_label: activejobs-${{ github.sha }}
-      #     region: eu-west-1
        - name: "set activejobs deployment status to success"
         id: successful_deployment
         uses: octokit/request-action@v2.x
