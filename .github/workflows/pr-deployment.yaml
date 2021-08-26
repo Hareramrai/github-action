@@ -25,6 +25,16 @@ jobs:
         if: steps.check.outputs.triggered == 'true'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          
+      - name: "Checkout to a branch"
+        run: |
+          PR_URL="${{ github.event.pull_request.head.sha }}"
+          BRANCH="${{ fromJson(steps.create_deployment.outputs.data).id }}"
+          echo "Checking out from $PR_URL and branch $BRANCH"
+          git checkout $BRANCH
+        if: steps.check.outputs.triggered == 'true'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: "Deploy"
         run: |
